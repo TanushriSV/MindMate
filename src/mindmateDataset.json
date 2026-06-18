@@ -1,0 +1,32 @@
+{
+  "categories": [
+    {
+      "name": "stress",
+      "keywords": ["stress", "overwhelm", "exam", "test", "study", "work", "procrastinate"],
+      "empathy": "I understand that exams and studying can feel overwhelming. It's completely normal to feel stressed during this time.",
+      "guidance": "You could try breaking your study sessions into smaller parts and taking short breaks to relax. A brief [Breathing Space](/breathe) can help clear your mind.",
+      "support": "You're doing your best, and that matters."
+    },
+    {
+      "name": "anxiety",
+      "keywords": ["anxious", "panic", "scared", "fear", "worry", "breath"],
+      "empathy": "I hear you, and it sounds like things feel really intense right now. Feeling anxious is tough, but you are not alone.",
+      "guidance": "Let's try a simple [Grounding Movement](/breathe?tab=ground) or naming 5 things you can see around you to help center yourself.",
+      "support": "Take it one moment at a time. I'm here for you."
+    },
+    {
+      "name": "sadness",
+      "keywords": ["sad", "lonely", "depress", "blue", "cry", "grief", "grieve", "down", "unhappy"],
+      "empathy": "I'm so sorry you're feeling this way. It is completely okay to feel sad and to let yourself experience those emotions.",
+      "guidance": "Maybe write down what's on your mind in a private journal, or try taking a [Movement Break](/breathe?tab=move) to shift your energy.",
+      "support": "Remember to be gentle with yourself today."
+    },
+    {
+      "name": "anger",
+      "keywords": ["angry", "mad", "furious", "hate", "irritated", "annoyed", "frustrat", "fight", "conflict"],
+      "empathy": "It is completely valid to feel frustrated or angry when things go wrong.",
+      "guidance": "Try taking a quick physical break to walk around, or write down everything you're angry about on a piece of paper, then delete or shred it.",
+      "support": "Take all the space you need. Your feelings are valid."
+    }
+  ]
+}
