@@ -1,0 +1,471 @@
+{
+  "intents": [
+    {
+      "intent": "stress",
+      "patterns": [
+        "I feel overwhelmed",
+        "Everything is too much",
+        "I can't handle all this",
+        "I'm stressed out",
+        "Too much is happening at once",
+        "I feel pressure from everything",
+        "I don't know where to start",
+        "It's all piling up",
+        "I'm mentally overloaded",
+        "I feel suffocated with work",
+        "I'm overwhelmed with everything going on",
+        "I feel like I have too much on my plate",
+        "I'm under too much pressure",
+        "I feel like I'm drowning in work",
+        "I can't manage all these responsibilities",
+        "I'm mentally exhausted from everything",
+        "I feel like I’m about to break down",
+        "Everything feels out of control",
+        "I’m stressed beyond my limit",
+        "I can’t keep up with everything"
+      ],
+      "responses": [
+        {
+          "text": "That sounds really overwhelming. When everything hits at once, it can feel like there's no space to breathe.",
+          "suggestion": "Let's slow it down — pick just one small thing to focus on."
+        },
+        {
+          "text": "I can hear how heavy this feels for you. Anyone in your place would feel stressed too.",
+          "suggestion": "Try writing everything down and tackle just one piece."
+        },
+        {
+          "text": "It feels like everything is demanding your attention at the same time, right?",
+          "suggestion": "Pause for a minute and take a few slow breaths."
+        },
+        {
+          "text": "You're carrying a lot right now, and that can be exhausting.",
+          "suggestion": "Give yourself permission to take a short break."
+        }
+      ]
+    },
+    {
+      "intent": "anxiety",
+      "patterns": [
+        "I feel anxious",
+        "I'm panicking",
+        "My chest feels tight",
+        "I feel nervous all the time",
+        "I can't calm down",
+        "My thoughts are racing",
+        "I feel uneasy",
+        "I feel scared for no reason",
+        "My heart is beating fast",
+        "I feel restless",
+        "I feel uneasy all the time",
+        "I have a constant fear inside me",
+        "I can't relax at all",
+        "I feel like something bad will happen",
+        "I feel on edge constantly",
+        "I’m always tense for no reason",
+        "My mind won’t stop worrying",
+        "I feel nervous without reason",
+        "I can’t calm my thoughts",
+        "I feel panic randomly"
+      ],
+      "responses": [
+        {
+          "text": "That sounds really intense. Anxiety can feel overwhelming both in your mind and body.",
+          "suggestion": "Try slow breathing — inhale for 4, exhale for 6."
+        },
+        {
+          "text": "I'm here with you. That uneasy feeling can be really hard to sit with.",
+          "suggestion": "Look around and name 5 things you can see."
+        },
+        {
+          "text": "It feels like your mind won’t slow down, right?",
+          "suggestion": "Place your hand on your chest and breathe slowly."
+        },
+        {
+          "text": "Even though it feels scary, you're safe in this moment.",
+          "suggestion": "Focus on your breathing for a minute."
+        }
+      ]
+    },
+    {
+      "intent": "overthinking",
+      "patterns": [
+        "I overthink everything",
+        "I can't stop thinking",
+        "My mind keeps replaying things",
+        "I keep thinking about the past",
+        "I imagine worst cases",
+        "I can't turn my brain off",
+        "I think too much",
+        "My thoughts won't stop",
+        "I keep analyzing everything",
+        "I replay conversations in my head",
+        "I keep thinking about every small detail",
+        "I replay everything in my mind",
+        "I analyze things too much",
+        "I can’t stop thinking about what happened",
+        "My brain won’t shut off",
+        "I keep imagining bad scenarios",
+        "I think about things again and again",
+        "I get stuck in my thoughts",
+        "I question everything I do",
+        "I can’t let things go"
+      ],
+      "responses": [
+        {
+          "text": "That loop of thoughts can feel exhausting, like your mind just won’t let go.",
+          "suggestion": "Try writing your thoughts down to clear your head."
+        },
+        {
+          "text": "It sounds like your mind is stuck in overdrive right now.",
+          "suggestion": "Ask yourself: is this helping me or draining me?"
+        },
+        {
+          "text": "Overthinking can make everything feel heavier than it really is.",
+          "suggestion": "Shift your attention to something simple and calming."
+        },
+        {
+          "text": "You're trying to make sense of everything, but it’s becoming overwhelming.",
+          "suggestion": "Give your mind a break — even a short one helps."
+        }
+      ]
+    },
+    {
+      "intent": "loneliness",
+      "patterns": [
+        "I feel lonely",
+        "I feel alone",
+        "No one understands me",
+        "I feel disconnected",
+        "I feel left out",
+        "Nobody talks to me",
+        "I feel invisible",
+        "I feel ignored",
+        "I have no one to talk to",
+        "I feel empty inside",
+        "I feel like no one cares about me",
+        "I feel isolated",
+        "I feel disconnected from everyone",
+        "I feel like I don’t belong anywhere",
+        "I don’t have anyone to talk to",
+        "I feel emotionally alone",
+        "I feel distant from people",
+        "I feel like nobody understands me",
+        "I feel left behind",
+        "I feel invisible to others"
+      ],
+      "responses": [
+        {
+          "text": "That kind of loneliness can feel really deep… like no one truly sees you.",
+          "suggestion": "Maybe try reaching out to someone you trust, even a small message."
+        },
+        {
+          "text": "I'm really sorry you're feeling this way. You don’t deserve to feel alone.",
+          "suggestion": "You could try connecting with someone, even briefly."
+        },
+        {
+          "text": "Feeling disconnected can be really painful.",
+          "suggestion": "Even one meaningful conversation can make a difference."
+        },
+        {
+          "text": "You’re not as alone as it feels right now, even if your mind says otherwise.",
+          "suggestion": "I'm here with you — you can talk to me."
+        }
+      ]
+    },
+    {
+      "intent": "motivation",
+      "patterns": [
+        "I have no motivation",
+        "I can't start anything",
+        "I feel lazy",
+        "I don't feel like doing anything",
+        "I keep procrastinating",
+        "I can't get myself to work",
+        "I feel stuck",
+        "I don't want to do anything",
+        "I can't begin",
+        "I have no energy to start",
+        "I don’t feel like doing anything",
+        "I have zero energy to work",
+        "I feel lazy but I know I shouldn't",
+        "I just can't get started",
+        "I keep delaying everything",
+        "I don't feel driven anymore",
+        "I feel stuck and unproductive",
+        "I have no energy to continue",
+        "I lack the will to do things",
+        "I feel like doing nothing all day"
+      ],
+      "responses": [
+        {
+          "text": "It’s not that you don’t want to do things — it feels like you just can’t start, right?",
+          "suggestion": "Start with just 2 minutes. That’s enough."
+        },
+        {
+          "text": "That stuck feeling can be really frustrating.",
+          "suggestion": "Pick the easiest task and begin there."
+        },
+        {
+          "text": "You're not lazy — your mind is probably overwhelmed.",
+          "suggestion": "Break your task into something really small."
+        },
+        {
+          "text": "Starting feels like the hardest part sometimes.",
+          "suggestion": "Try doing just a tiny step."
+        }
+      ]
+    },
+    {
+      "intent": "low_self_worth",
+      "patterns": [
+        "I'm not good enough",
+        "I feel like a failure",
+        "I hate myself",
+        "I feel useless",
+        "I'm worthless",
+        "I always mess up",
+        "I'm not capable",
+        "I feel inferior",
+        "I can't do anything right",
+        "I'm not smart enough",
+        "I feel like I'm not enough",
+        "I don't deserve anything good",
+        "I'm a disappointment",
+        "I feel like I don't matter",
+        "I'm not worthy",
+        "I feel like everyone is better than me",
+        "I hate who I am",
+        "I feel like a burden",
+        "I'm not useful to anyone",
+        "I feel like I don't belong"
+      ],
+      "responses": [
+        {
+          "text": "That’s a really painful thought to carry. It doesn’t define who you are.",
+          "suggestion": "Think of one small thing you’ve done well."
+        },
+        {
+          "text": "I'm really sorry you're feeling this way. You’re being very hard on yourself.",
+          "suggestion": "Try speaking to yourself like you would to a friend."
+        },
+        {
+          "text": "Those thoughts feel real, but they’re not the full truth about you.",
+          "suggestion": "Write down something you're proud of."
+        },
+        {
+          "text": "You’re more than your mistakes, even if it doesn’t feel that way.",
+          "suggestion": "Be gentle with yourself today."
+        }
+      ]
+    },
+    {
+      "intent": "burnout",
+      "patterns": [
+        "I feel exhausted",
+        "I'm mentally tired",
+        "I feel drained",
+        "I can't keep going",
+        "I'm burned out",
+        "I feel tired all the time",
+        "I have no energy",
+        "I'm drained emotionally",
+        "I feel worn out",
+        "I'm completely tired",
+        "I feel completely drained",
+        "I can't focus anymore",
+        "I feel mentally exhausted",
+        "I'm too tired to do anything",
+        "I feel like I have no energy left",
+        "Everything feels like too much effort",
+        "I feel overwhelmed and tired",
+        "I just want to sleep all day",
+        "I feel emotionally exhausted",
+        "I can't keep up with anything"
+      ],
+      "responses": [
+        {
+          "text": "That sounds like deep exhaustion, not just being tired.",
+          "suggestion": "Take a real break — your mind needs it."
+        },
+        {
+          "text": "You've been pushing yourself a lot, haven’t you?",
+          "suggestion": "Give yourself permission to rest."
+        },
+        {
+          "text": "Burnout can feel really heavy and draining.",
+          "suggestion": "Try stepping away for a while."
+        },
+        {
+          "text": "Your mind is asking for rest right now.",
+          "suggestion": "Even a short pause can help."
+        }
+      ]
+    },
+    {
+      "intent": "academic_pressure",
+      "patterns": [
+        "I have exams",
+        "Too many assignments",
+        "I failed my test",
+        "I'm scared about results",
+        "Study pressure is too much",
+        "I can't handle studies",
+        "I'm worried about grades",
+        "I have deadlines",
+        "I can't finish syllabus",
+        "I feel pressure to perform",
+        "I'm stressed about exams",
+        "I can't keep up with studies",
+        "There's too much to study",
+        "I'm afraid I'll fail",
+        "I don't understand anything",
+        "I feel behind in class",
+        "I can't manage my time",
+        "I'm stressed about homework",
+        "I feel lost in studies",
+        "I can't concentrate on studying"
+      ],
+      "responses": [
+        {
+          "text": "That academic pressure can feel really intense.",
+          "suggestion": "Focus on important topics instead of everything."
+        },
+        {
+          "text": "It’s a lot to handle, especially with deadlines.",
+          "suggestion": "Break your work into smaller parts."
+        },
+        {
+          "text": "You're doing your best under pressure.",
+          "suggestion": "Take short breaks to stay fresh."
+        },
+        {
+          "text": "It’s okay to feel stressed about studies.",
+          "suggestion": "Focus on progress, not perfection."
+        }
+      ]
+    },
+    {
+      "intent": "crisis",
+      "patterns": [
+        "I want to give up",
+        "Nothing matters",
+        "I can't do this anymore",
+        "I feel hopeless",
+        "I don't see a point",
+        "I feel empty",
+        "I feel broken",
+        "I hate my life",
+        "I don't want to exist",
+        "Everything feels pointless",
+        "I feel like giving up on everything",
+        "I don't want to continue",
+        "I feel like there's no hope",
+        "I don't see a future",
+        "I feel completely lost",
+        "I can't take this anymore",
+        "I feel like disappearing",
+        "I wish I wasn't here",
+        "I feel like ending it all",
+        "I don't want to wake up",
+        "i dont want to live",
+        "life is not worth it",
+        "i wish i was dead",
+        "i want to disappear"
+      ],
+      "responses": [
+        {
+          "text": "I'm really sorry you're feeling this much pain. You’re not alone in this moment, even if it feels like it.",
+          "suggestion": "It might really help to talk to someone you trust — a friend, family member, or a professional."
+        },
+        {
+          "text": "I'm really glad you told me. That takes courage. You deserve support and care.",
+          "suggestion": "If you can, please consider reaching out to a helpline or someone close to you right now."
+        },
+        {
+          "text": "That sounds incredibly heavy to carry. You don’t have to go through this alone.",
+          "suggestion": "Please try to connect with someone — even sending a simple message can help."
+        },
+        {
+          "text": "I’m here with you, and I care about what you’re going through.",
+          "suggestion": "If you're in immediate danger, please contact your local emergency number or a crisis helpline."
+        }
+      ]
+    },
+    {
+      "intent": "sadness",
+      "patterns": [
+        "I feel sad",
+        "I am sad",
+        "I feel unhappy",
+        "I've been crying",
+        "I feel down",
+        "I feel blue",
+        "I feel low",
+        "I feel gloomy",
+        "I feel miserable",
+        "I feel heartbroken",
+        "I feel depressed",
+        "I feel empty and sad",
+        "I don't feel okay",
+        "I feel like crying",
+        "everything feels sad",
+        "I feel really low today",
+        "I feel so down right now",
+        "I'm not okay",
+        "I feel broken inside",
+        "I just feel really sad"
+      ],
+      "responses": [
+        {
+          "text": "I'm sorry you're feeling sad. It's okay to feel this way — your feelings are valid.",
+          "suggestion": "Try to be gentle with yourself today. Small comforts matter."
+        },
+        {
+          "text": "Sadness can feel really heavy sometimes. I'm here with you.",
+          "suggestion": "Maybe try listening to music or stepping outside for a few minutes."
+        },
+        {
+          "text": "It's okay to not be okay. You don't have to explain your sadness.",
+          "suggestion": "Allow yourself to feel it without judgment."
+        },
+        {
+          "text": "That low feeling can be really draining. You're not alone in this.",
+          "suggestion": "Reach out to someone you trust, or just rest if you need to."
+        }
+      ]
+    },
+    {
+      "intent": "confusion",
+      "patterns": [
+        "I feel confused",
+        "I don't know what to do",
+        "I'm so lost",
+        "Nothing makes sense",
+        "I can't figure this out",
+        "My mind is a mess",
+        "I don't understand what's happening",
+        "I'm unsure about everything",
+        "I have no direction",
+        "I feel completely clueless"
+      ],
+      "responses": [
+        {
+          "text": "It’s completely okay to feel confused. You don't have to have all the answers right now.",
+          "suggestion": "Take a step back and just breathe. Clarity often comes when we stop forcing it."
+        },
+        {
+          "text": "Feeling lost can be really disorienting. I'm here to help you sort through it.",
+          "suggestion": "Try writing down exactly what's confusing you. Sometimes seeing it on paper helps."
+        },
+        {
+          "text": "When nothing makes sense, it's a sign your mind needs a break.",
+          "suggestion": "Give yourself permission to pause. You can figure this out later."
+        },
+        {
+          "text": "It sounds like you're trying to process a lot of uncertainty right now.",
+          "suggestion": "Focus on just the very next step, no matter how small."
+        }
+      ]
+    }
+  ]
+}
