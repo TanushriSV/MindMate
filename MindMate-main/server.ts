@@ -169,7 +169,11 @@ if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
   throw new Error("JWT_SECRET environment variable is required in production mode.");
 }
 
-const SERVER_SECRET = process.env.JWT_SECRET || "mindmate_secure_development_fallback_hash_key_123!";
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET is required");
+}
+
+const SERVER_SECRET = process.env.JWT_SECRET;
 
 function issueToken(userId: string): string {
   const payload = JSON.stringify({ userId, expiry: Date.now() + 7 * 24 * 3600 * 1000 });
