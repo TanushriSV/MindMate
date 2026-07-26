@@ -1,6 +1,22 @@
+# IDE
 .idea/
 .gradle/
+
+# Build
 build/
 node_modules/
-*.local
+
+# Environment
 .env
+*.local
+
+# Database
+*.db
+
+# Logs
+*.log
+*.txt
+
+# OS files
+.DS_Store
+Thumbs.db
