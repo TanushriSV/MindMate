@@ -1,0 +1,6 @@
+{
+  "name": "MindMate",
+  "description": "Your digital sanctuary for reflection and inner peace.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
