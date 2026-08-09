@@ -5,7 +5,7 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import crypto from "crypto";
-import Database from "better-sqlite3";
+import pg from "pg";
 import bcrypt from "bcrypt";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
@@ -70,126 +70,129 @@ const aiRateLimiter = rateLimit({
 // Relaxed rate limiting for chat to allow uninterrupted continuous chatting
 app.use("/api/daily-insight", aiRateLimiter);
 
-// Initialize SQLite Database with configurable DATABASE_PATH
-let db: any;
-try {
-  const dbPath = process.env.DATABASE_PATH || './mindmate.db';
-  db = new Database(dbPath);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-} catch (dbInitErr) {
-  logError("Persistent Database Initialization Failure - Falling back to local memory database", dbInitErr);
-  db = new Database(":memory:");
-}
+// Initialize PostgreSQL Connection Pool using DATABASE_URL
+const pgPool = new pg.Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : undefined
+});
 
-// Create DB tables if they don't exist
-try {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE,
-      password_hash TEXT,
-      name TEXT,
-      avatar TEXT,
-      join_date INTEGER
-    );
+// Resilient Pool error listener
+pgPool.on("error", (err) => {
+  logError("PostgreSQL Pool Idle Client Error", err);
+});
 
-    CREATE TABLE IF NOT EXISTS mood_entries (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      mood TEXT,
-      timestamp INTEGER,
-      stress_level INTEGER,
-      sleep_quality TEXT,
-      anxiety_score INTEGER,
-      anxiety_level TEXT,
-      stress_indicators TEXT, -- JSON string
-      note TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS chat_sessions (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      title TEXT,
-      created_at INTEGER,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS chat_messages (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      role TEXT,
-      text TEXT,
-      timestamp INTEGER,
-      session_id TEXT,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS reset_tokens (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE,
-      token TEXT,
-      expires_at INTEGER
-    );
-
-    CREATE TABLE IF NOT EXISTS user_streaks (
-      user_id TEXT PRIMARY KEY,
-      last_checkin_date TEXT,
-      streak_count INTEGER,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS emotion_logs (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      emotion TEXT,
-      confidence REAL,
-      created_at INTEGER,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS feedback (
-      id TEXT PRIMARY KEY,
-      user_id TEXT,
-      rating INTEGER,
-      review TEXT,
-      created_at INTEGER,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_mood_user ON mood_entries(user_id);
-    CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id);
-    CREATE INDEX IF NOT EXISTS idx_session_user ON chat_sessions(user_id);
-    CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);
-  `);
-
-  // Rugged and safe column detection & migration for session_id in case table was created previously without it
+// Setup schema and initial indexes
+async function initDatabase() {
   try {
-    const columns = db.prepare("PRAGMA table_info(chat_messages)").all();
-    const hasSessionId = columns.some((col: any) => col.name === "session_id");
-    if (!hasSessionId) {
-      db.exec("ALTER TABLE chat_messages ADD COLUMN session_id TEXT;");
-      console.log("Database Migration: session_id column added successfully to chat_messages table.");
-    }
-  } catch (alterErr: any) {
-    // If the migration failed, attempt fallback statement directly
+    await pgPool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(100) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE,
+        password_hash VARCHAR(255),
+        name VARCHAR(255),
+        avatar TEXT,
+        join_date BIGINT
+      );
+
+      CREATE TABLE IF NOT EXISTS mood_entries (
+        id VARCHAR(100) PRIMARY KEY,
+        user_id VARCHAR(100),
+        mood VARCHAR(100),
+        timestamp BIGINT,
+        stress_level INTEGER,
+        sleep_quality VARCHAR(50),
+        anxiety_score INTEGER,
+        anxiety_level VARCHAR(50),
+        stress_indicators TEXT, -- JSON string
+        note TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS chat_sessions (
+        id VARCHAR(100) PRIMARY KEY,
+        user_id VARCHAR(100),
+        title VARCHAR(255),
+        created_at BIGINT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS chat_messages (
+        id VARCHAR(100) PRIMARY KEY,
+        user_id VARCHAR(100),
+        role VARCHAR(50),
+        text TEXT,
+        timestamp BIGINT,
+        session_id VARCHAR(100),
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS reset_tokens (
+        id VARCHAR(100) PRIMARY KEY,
+        email VARCHAR(255) UNIQUE,
+        token VARCHAR(255),
+        expires_at BIGINT
+      );
+
+      CREATE TABLE IF NOT EXISTS user_streaks (
+        user_id VARCHAR(100) PRIMARY KEY,
+        last_checkin_date VARCHAR(50),
+        streak_count INTEGER,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS emotion_logs (
+        id VARCHAR(100) PRIMARY KEY,
+        user_id VARCHAR(100),
+        emotion VARCHAR(100),
+        confidence DOUBLE PRECISION,
+        created_at BIGINT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE TABLE IF NOT EXISTS feedback (
+        id VARCHAR(100) PRIMARY KEY,
+        user_id VARCHAR(100),
+        rating INTEGER,
+        review TEXT,
+        created_at BIGINT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_mood_user ON mood_entries(user_id);
+      CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id);
+      CREATE INDEX IF NOT EXISTS idx_session_user ON chat_sessions(user_id);
+      CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);
+    `);
+
+    // Verify session_id column exists inside chat_messages table
     try {
-      db.exec("ALTER TABLE chat_messages ADD COLUMN session_id TEXT;");
-    } catch (e: any) {
-      console.warn("Could not alter chat_messages table:", e.message);
+      const colCheck = await pgPool.query(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'chat_messages' AND column_name = 'session_id'
+      `);
+      if (colCheck.rows.length === 0) {
+        await pgPool.query("ALTER TABLE chat_messages ADD COLUMN session_id VARCHAR(100);");
+        console.log("Database Migration: session_id column added successfully to chat_messages table.");
+      }
+    } catch (alterErr: any) {
+      console.warn("Could not check/alter chat_messages table:", alterErr.message);
     }
-  }
 
-  // Create the session index now that the column exists
-  try {
-    db.exec("CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id);");
-  } catch (indexErr: any) {
-    // Index creation error
+    // Create session index
+    try {
+      await pgPool.query("CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_messages(session_id);");
+    } catch (indexErr: any) {
+      // index error catch
+    }
+    console.log("PostgreSQL Database Schema verified successfully.");
+  } catch (schemaErr) {
+    logError("PostgreSQL Database Initialization Failure", schemaErr);
   }
-} catch (tableErr) {
-  logError("DB Tables Schema Deployment Failure", tableErr);
 }
+
+// Fire async database initialization
+initDatabase();
 
 // Server-side cryptographic helper utilities for session management
 if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
@@ -274,89 +277,44 @@ function decryptField(cipherText: string): string {
   }
 }
 
-// Safe database task pipeline to serialize writes/reads where needed, preventing database lock constraints (SQLITE_BUSY)
-const dbQueue: Array<() => Promise<any>> = [];
-let dbQueueRunning = false;
-
-async function enqueueDbTask<T>(task: () => Promise<T>): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    dbQueue.push(async () => {
-      try {
-        const result = await task();
-        resolve(result);
-      } catch (error) {
-        reject(error);
-      }
-    });
-    processDbQueue();
-  });
-}
-
-async function processDbQueue() {
-  if (dbQueueRunning) return;
-  dbQueueRunning = true;
-  while (dbQueue.length > 0) {
-    const task = dbQueue.shift();
-    if (task) {
-      try {
-        await task();
-      } catch (err) {
-        logError("Serial Database Queue execution error", err);
-      }
-    }
-  }
-  dbQueueRunning = false;
-}
-
-// Helper to offload synchronous better-sqlite3 queries to a deferred queued microtask system,
-// preventing Node.js event-loop blockage on database I/O and SQLITE_BUSY locks.
+// Database helpers mapped to pgPool
 async function dbGet<T = any>(sql: string, ...params: any[]): Promise<T | undefined> {
-  return enqueueDbTask(() => {
-    return new Promise<T | undefined>((resolve, reject) => {
-      setImmediate(() => {
-        try {
-          const stmt = db.prepare(sql);
-          resolve(stmt.get(...params) as T);
-        } catch (error) {
-          reject(error);
-        }
-      });
-    });
-  });
+  const pgSql = convertPlaceholders(sql);
+  try {
+    const result = await pgPool.query(pgSql, params);
+    return result.rows[0] as T;
+  } catch (error) {
+    throw error;
+  }
 }
 
 async function dbAll<T = any>(sql: string, ...params: any[]): Promise<T[]> {
-  return enqueueDbTask(() => {
-    return new Promise<T[]>((resolve, reject) => {
-      setImmediate(() => {
-        try {
-          const stmt = db.prepare(sql);
-          resolve(stmt.all(...params) as T[]);
-        } catch (error) {
-          reject(error);
-        }
-      });
-    });
-  });
+  const pgSql = convertPlaceholders(sql);
+  try {
+    const result = await pgPool.query(pgSql, params);
+    return result.rows as T[];
+  } catch (error) {
+    throw error;
+  }
 }
 
-async function dbRun(sql: string, ...params: any[]): Promise<{ changes: number; lastInsertRowid: number | bigint }> {
-  return enqueueDbTask(() => {
-    return new Promise((resolve, reject) => {
-      setImmediate(() => {
-        try {
-          const stmt = db.prepare(sql);
-          const result = stmt.run(...params);
-          resolve({
-            changes: result.changes,
-            lastInsertRowid: result.lastInsertRowid
-          });
-        } catch (error) {
-          reject(error);
-        }
-      });
-    });
-  });
+async function dbRun(sql: string, ...params: any[]): Promise<{ changes: number; lastInsertRowid: number | string }> {
+  const pgSql = convertPlaceholders(sql);
+  try {
+    const result = await pgPool.query(pgSql, params);
+    return {
+      changes: result.rowCount || 0,
+      lastInsertRowid: 0
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+
+// Convert SQLite '?' parameter placeholders to PostgreSQL '$1', '$2', etc.
+function convertPlaceholders(sql: string): string {
+  let index = 1;
+  return sql.replace(/\?/g, () => `$${index++}`);
 }
 
 // Middleware to authenticate requests to prevent key leakage and resource drainage
@@ -979,8 +937,10 @@ app.post("/api/auth/reset-request", async (req: any, res: any) => {
     const expiresAt = Date.now() + 3600 * 1000; // 1 hour from now
 
     await dbRun(`
-      INSERT OR REPLACE INTO reset_tokens (id, email, token, expires_at)
+      INSERT INTO reset_tokens (id, email, token, expires_at)
       VALUES (?, ?, ?, ?)
+      ON CONFLICT (email) DO UPDATE
+      SET token = EXCLUDED.token, expires_at = EXCLUDED.expires_at
     `, crypto.randomBytes(16).toString("hex"), emailNormalized, resetToken, expiresAt);
 
     const resetUrl = `${process.env.FRONTEND_URL || "http://localhost:5173"}/reset-password?token=${resetToken}&email=${encodeURIComponent(emailNormalized)}`;
@@ -1136,9 +1096,13 @@ app.post("/api/entries", authenticateUser, async (req: any, res: any) => {
     const encryptedNote = encryptField(finalNote);
 
     await dbRun(`
-      INSERT OR REPLACE INTO mood_entries 
+      INSERT INTO mood_entries
       (id, user_id, mood, timestamp, stress_level, sleep_quality, anxiety_score, anxiety_level, stress_indicators, note)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT (id) DO UPDATE
+      SET mood = EXCLUDED.mood, timestamp = EXCLUDED.timestamp, stress_level = EXCLUDED.stress_level,
+          sleep_quality = EXCLUDED.sleep_quality, anxiety_score = EXCLUDED.anxiety_score,
+          anxiety_level = EXCLUDED.anxiety_level, stress_indicators = EXCLUDED.stress_indicators, note = EXCLUDED.note
     `,
       id,
       req.userId,
@@ -1264,7 +1228,7 @@ app.get("/api/chat/history", authenticateUser, async (req: any, res: any) => {
     if (sessionId) {
       // Security + correctness fix: verify the requested sessionId belongs to this user
       const correctSession = await dbGet(`
-        SELECT id FROM chat_sessions 
+        SELECT id FROM chat_sessions
         WHERE id = ? AND user_id = ?
       `, sessionId, req.userId);
 
@@ -1275,9 +1239,9 @@ app.get("/api/chat/history", authenticateUser, async (req: any, res: any) => {
 
     if (!sessionId) {
       const latestSession = await dbGet(`
-        SELECT id FROM chat_sessions 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC 
+        SELECT id FROM chat_sessions
+        WHERE user_id = ?
+        ORDER BY created_at DESC
         LIMIT 1
       `, req.userId) as any;
 
@@ -1294,9 +1258,9 @@ app.get("/api/chat/history", authenticateUser, async (req: any, res: any) => {
     }
 
     const rows = await dbAll(`
-      SELECT * FROM chat_messages 
-      WHERE user_id = ? AND session_id = ? 
-      ORDER BY timestamp DESC 
+      SELECT * FROM chat_messages
+      WHERE user_id = ? AND session_id = ?
+      ORDER BY timestamp DESC
       LIMIT 100
     `, req.userId, sessionId) as any[];
 
@@ -1332,9 +1296,9 @@ app.post("/api/chat/save", authenticateUser, async (req: any, res: any) => {
     let targetSessionId = sessionId;
     if (!targetSessionId) {
       const latestSession = await dbGet(`
-        SELECT id FROM chat_sessions 
-        WHERE user_id = ? 
-        ORDER BY created_at DESC 
+        SELECT id FROM chat_sessions
+        WHERE user_id = ?
+        ORDER BY created_at DESC
         LIMIT 1
       `, req.userId) as any;
 
@@ -1351,7 +1315,7 @@ app.post("/api/chat/save", authenticateUser, async (req: any, res: any) => {
     } else {
       // Security separation fix: verify the targetSessionId actually belongs to req.userId
       const sessionExists = await dbGet(`
-        SELECT 1 FROM chat_sessions 
+        SELECT 1 FROM chat_sessions
         WHERE user_id = ? AND id = ?
       `, req.userId, targetSessionId);
 
@@ -1359,8 +1323,10 @@ app.post("/api/chat/save", authenticateUser, async (req: any, res: any) => {
         // Safe isolation: insert/create a session belonging uniquely to this active student user
         const sessionTitle = `Chat Session ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`;
         await dbRun(`
-          INSERT OR REPLACE INTO chat_sessions (id, user_id, title, created_at)
+          INSERT INTO chat_sessions (id, user_id, title, created_at)
           VALUES (?, ?, ?, ?)
+          ON CONFLICT (id) DO UPDATE
+          SET title = EXCLUDED.title, created_at = EXCLUDED.created_at
         `, targetSessionId, req.userId, sessionTitle, Date.now());
       }
     }
@@ -1369,8 +1335,10 @@ app.post("/api/chat/save", authenticateUser, async (req: any, res: any) => {
     const encryptedText = encryptField(text);
 
     await dbRun(`
-      INSERT OR REPLACE INTO chat_messages (id, user_id, role, text, timestamp, session_id)
+      INSERT INTO chat_messages (id, user_id, role, text, timestamp, session_id)
       VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT (id) DO UPDATE
+      SET text = EXCLUDED.text, timestamp = EXCLUDED.timestamp, session_id = EXCLUDED.session_id
     `, id, req.userId, role, encryptedText, finalTimestamp, targetSessionId);
 
     // Clean up older messages, keeping only the last 100 messages for this specific session
@@ -1867,7 +1835,7 @@ app.get("/api/feedback", async (req: any, res: any) => {
     // Calculate aggregated stats
     const totalCount = rows.length;
     const averageRating = totalCount > 0 ? (rows.reduce((sum, r) => sum + r.rating, 0) / totalCount) : 0;
-    
+
     // Map distinct user IDs to anonymous User numbers dynamically (e.g. user_abc -> User 001)
     const userIdMap = new Map<string, string>();
     let userSeq = 1;
@@ -1993,17 +1961,17 @@ async function startServer() {
 startServer();
 
 // Securely handle graceful shutdown of process and DB context
-function gracefulShutdown(signal: string) {
+async function gracefulShutdown(signal: string) {
   console.log(`Received ${signal}. Starting secure graceful shutdown...`);
   try {
-    db.close();
-    console.log("SQLite database connection closed successfully.");
+    await pgPool.end();
+    console.log("PostgreSQL database connection closed successfully.");
     process.exit(0);
   } catch (error: any) {
-    logError("Error closing SQLite database context safely on exit", error);
+    logError("Error closing PostgreSQL database context safely on exit", error);
     process.exit(1);
   }
 }
 
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => { gracefulShutdown("SIGINT"); });
+process.on("SIGTERM", () => { gracefulShutdown("SIGTERM"); });
