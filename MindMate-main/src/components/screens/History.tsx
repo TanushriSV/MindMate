@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, AlertCircle, Calendar, MessageCircle, ChevronRight, Check } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { IMAGES } from '../../constants';
 import { Screen, MoodEntry } from '../../types';
 import { useEntries } from '../../context/EntriesContext';
+import { API_BASE_URL } from '../../apiConfig';
 
 interface HistoryScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -28,6 +29,55 @@ export default function HistoryScreen({ onNavigate }: HistoryScreenProps) {
   const { entries, deleteEntry, hydrated } = useEntries();
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const [emotionTrends, setEmotionTrends] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchTrends = async () => {
+      try {
+        const userStr = localStorage.getItem('mindmate_user');
+        const token = userStr ? JSON.parse(userStr).token : null;
+        const res = await fetch(API_BASE_URL + "/api/emotion-trends", {
+          headers: {
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setEmotionTrends(data);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch emotion trends:", err);
+      }
+    };
+    fetchTrends();
+  }, []);
+
+  const emotionScores: Record<string, number> = {
+    anxiety: 0,
+    sadness: 1,
+    stress: 2,
+    motivation: 3
+  };
+
+  const formatYAxis = (value: number) => {
+    switch (value) {
+      case 0: return 'Anxiety 😰';
+      case 1: return 'Sadness 😢';
+      case 2: return 'Stress 😟';
+      case 3: return 'Motivation 💪';
+      default: return '';
+    }
+  };
+
+  const mappedTrends = useMemo(() => {
+    return emotionTrends.map(log => ({
+      date: new Date(log.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+      score: emotionScores[log.emotion] !== undefined ? emotionScores[log.emotion] : 1.5,
+      emotion: log.emotion,
+      confidence: log.confidence
+    }));
+  }, [emotionTrends]);
 
   // Filter States
   const [dateFilter, setDateFilter] = useState<'All' | 'Week' | 'Month'>('All');
@@ -277,6 +327,51 @@ export default function HistoryScreen({ onNavigate }: HistoryScreenProps) {
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Emotion Trends Graph */}
+      <section className="bg-white rounded-3xl p-8 calm-shadow border border-surface-variant/30 flex flex-col relative">
+        <div>
+          <h2 className="text-2xl font-bold text-on-background">AI Emotion Analytics Trajectory</h2>
+          <p className="text-xs font-bold text-on-surface-variant uppercase tracking-widest mt-1">Real-time classification history from chat logs</p>
+        </div>
+
+        <div className="h-64 w-full mt-6">
+          {emotionTrends.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={mappedTrends}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E0E0E0" />
+                <XAxis dataKey="date" tick={{ fill: '#757575', fontSize: 10 }} stroke="#E0E0E0" />
+                <YAxis 
+                  domain={[0, 3]} 
+                  ticks={[0, 1, 2, 3]}
+                  tickFormatter={formatYAxis} 
+                  tick={{ fill: '#757575', fontSize: 10 }} 
+                  stroke="#E0E0E0" 
+                />
+                <Tooltip 
+                  formatter={(value: any, name: any, props: any) => {
+                    const log = props.payload;
+                    return [`${log.emotion.toUpperCase()} (confidence: ${log.confidence.toFixed(2)})`, 'Classified Emotion'];
+                  }}
+                  contentStyle={{ borderRadius: 16, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="score" 
+                  stroke="#6750A4" 
+                  strokeWidth={3} 
+                  dot={{ r: 4, strokeWidth: 2, stroke: '#6750A4', fill: '#FFF' }} 
+                  activeDot={{ r: 6 }} 
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+              No emotion analytics logged yet. Chat with MindMate to generate trends.
+            </div>
+          )}
         </div>
       </section>
 

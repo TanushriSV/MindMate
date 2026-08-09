@@ -32,6 +32,8 @@ export interface ChatMessage {
   role: 'user' | 'model';
   text: string;
   timestamp: number;
+  emotion?: string | null;
+  confidence?: number | null;
 }
 
 declare global {

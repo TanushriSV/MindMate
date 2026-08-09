@@ -53,7 +53,7 @@ export async function sendMessage(
     };
     somaticIndicators?: string[];
   }
-) {
+): Promise<{ text: string; emotion?: string | null; confidence?: number | null }> {
   const token = getAuthToken();
   const maxRetries = 1;
   let finalErr: any = null;
@@ -75,21 +75,23 @@ export async function sendMessage(
       clearTimeout(timeoutId);
 
       const data = await handleResponse(response, "Failed to send message");
-      // 🛡️ SAFETY FIX
       if (!data || !data.text) {
         console.error("Invalid API response:", data);
-        return "AI is not responding properly. Try again 💛";
+        return { text: "AI is not responding properly. Try again 💛", emotion: null, confidence: null };
       }
 
-      return data.text;
+      return {
+        text: data.text,
+        emotion: data.emotion || null,
+        confidence: data.confidence || null
+      };
     } catch (err: any) {
       if (err.name === "AbortError") {
-        return "Taking longer than usual — please try again in a moment 💛";
+        return { text: "Taking longer than usual — please try again in a moment 💛", emotion: null, confidence: null };
       }
       console.warn(`[API Attempt ${attempt + 1}] Send message failed:`, err);
       finalErr = err;
       if (attempt < maxRetries) {
-        // Backoff delay of 1000ms before retrying the call once
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
@@ -104,7 +106,8 @@ Their journal entry: "${content}"
 
 Task: Write a short, empathetic reflection summary (max 3 sentences) that validates their emotions. Do NOT sound clinical or robotic. If they are struggling, optionally suggest a tiny actionable step. Speak directly to them with warmth.`;
 
-  return await sendMessage([{ role: 'user', parts: [{ text: prompt }] }]);
+  const res = await sendMessage([{ role: 'user', parts: [{ text: prompt }] }]);
+  return res.text;
 }
 
 export async function getDailyInsight() {

@@ -11,6 +11,7 @@ import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
 import compression from "compression";
 import { getMindMateReply } from "./src/mindmateLogic.ts";
+import axios from "axios";
 
 dotenv.config();
 
@@ -132,9 +133,35 @@ try {
       expires_at INTEGER
     );
 
+    CREATE TABLE IF NOT EXISTS user_streaks (
+      user_id TEXT PRIMARY KEY,
+      last_checkin_date TEXT,
+      streak_count INTEGER,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS emotion_logs (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      emotion TEXT,
+      confidence REAL,
+      created_at INTEGER,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS feedback (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      rating INTEGER,
+      review TEXT,
+      created_at INTEGER,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_mood_user ON mood_entries(user_id);
     CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id);
     CREATE INDEX IF NOT EXISTS idx_session_user ON chat_sessions(user_id);
+    CREATE INDEX IF NOT EXISTS idx_feedback_user ON feedback(user_id);
   `);
 
   // Rugged and safe column detection & migration for session_id in case table was created previously without it
@@ -198,6 +225,52 @@ function verifyToken(token: string): string | null {
     return payload.userId;
   } catch {
     return null;
+  }
+}
+
+// AES-256-GCM Authenticated Encryption for sensitive fields
+const ENCRYPTION_KEY_HEX = process.env.ENCRYPTION_KEY || "";
+let encryptionKeyBuffer: Buffer | null = null;
+
+if (ENCRYPTION_KEY_HEX.length === 64) {
+  encryptionKeyBuffer = Buffer.from(ENCRYPTION_KEY_HEX, "hex");
+} else if (process.env.NODE_ENV === "production") {
+  throw new Error("A valid 32-byte (64 hex characters) ENCRYPTION_KEY environment variable is required in production mode.");
+}
+
+function encryptField(text: string): string {
+  if (!text) return "";
+  if (!encryptionKeyBuffer) return text; // Fallback in non-prod dev if key is missing
+  try {
+    const iv = crypto.randomBytes(12);
+    const cipher = crypto.createCipheriv("aes-256-gcm", encryptionKeyBuffer, iv);
+    let encrypted = cipher.update(text, "utf8", "hex");
+    encrypted += cipher.final("hex");
+    const tag = cipher.getAuthTag().toString("hex");
+    return `${iv.toString("hex")}:${tag}:${encrypted}`;
+  } catch (err) {
+    console.error("Field encryption failure:", err);
+    return text;
+  }
+}
+
+function decryptField(cipherText: string): string {
+  if (!cipherText) return "";
+  if (!encryptionKeyBuffer) return cipherText;
+  try {
+    const parts = cipherText.split(":");
+    if (parts.length !== 3) return cipherText; // Plaintext or corrupted
+    const [ivHex, tagHex, encryptedHex] = parts;
+    const iv = Buffer.from(ivHex, "hex");
+    const tag = Buffer.from(tagHex, "hex");
+    const decipher = crypto.createDecipheriv("aes-256-gcm", encryptionKeyBuffer, iv);
+    decipher.setAuthTag(tag);
+    let decrypted = decipher.update(encryptedHex, "hex", "utf8");
+    decrypted += decipher.final("utf8");
+    return decrypted;
+  } catch (err) {
+    // Return original cipherText if decryption fails (supporting existing plaintext records transition)
+    return cipherText;
   }
 }
 
@@ -629,6 +702,7 @@ app.post("/api/auth/google", async (req: any, res: any) => {
     }
 
     // Call Google Tokeninfo endpoint to verify JWT cryptographically
+
     const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`);
     if (!response.ok) {
       return res.status(400).json({ error: "Invalid Google credential (cryptographic verification failed)." });
@@ -744,8 +818,8 @@ app.post("/api/auth/token", async (req: any, res: any) => {
       const isLocalhost =
         origin.includes("localhost") ||
         origin.includes("127.0.0.1") ||
-        origin.includes("10.213.85.221") ||
-        host.includes("10.213.85.221") ||
+        origin.includes("10.183.63.221") ||
+        host.includes("10.183.63.221") ||
         req.ip.includes("127.0.0.1") ||
         req.ip.includes("::1");
       if (isProduction || !isLocalhost) {
@@ -1059,6 +1133,7 @@ app.post("/api/entries", authenticateUser, async (req: any, res: any) => {
     const finalStressIndicators = JSON.stringify(parsedIndicators);
 
     const finalNote = (typeof note === "string") ? note.slice(0, 5000) : "";
+    const encryptedNote = encryptField(finalNote);
 
     await dbRun(`
       INSERT OR REPLACE INTO mood_entries 
@@ -1074,7 +1149,7 @@ app.post("/api/entries", authenticateUser, async (req: any, res: any) => {
       finalAnxietyScore,
       finalAnxietyLevel,
       finalStressIndicators,
-      finalNote
+      encryptedNote
     );
     res.json({ success: true });
   } catch (error: any) {
@@ -1095,7 +1170,7 @@ app.get("/api/entries", authenticateUser, async (req: any, res: any) => {
       anxietyScore: r.anxiety_score,
       anxietyLevel: r.anxiety_level,
       stressIndicators: JSON.parse(r.stress_indicators || "[]"),
-      note: r.note
+      note: decryptField(r.note || "")
     }));
     res.json(entries);
   } catch (error: any) {
@@ -1228,7 +1303,7 @@ app.get("/api/chat/history", authenticateUser, async (req: any, res: any) => {
     const messages = rows.reverse().map(r => ({
       id: r.id,
       role: r.role,
-      text: r.text,
+      text: decryptField(r.text || ""),
       timestamp: r.timestamp
     }));
 
@@ -1291,11 +1366,12 @@ app.post("/api/chat/save", authenticateUser, async (req: any, res: any) => {
     }
 
     const finalTimestamp = (typeof timestamp === "number" && timestamp > 0) ? timestamp : Date.now();
+    const encryptedText = encryptField(text);
 
     await dbRun(`
       INSERT OR REPLACE INTO chat_messages (id, user_id, role, text, timestamp, session_id)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, id, req.userId, role, text, finalTimestamp, targetSessionId);
+    `, id, req.userId, role, encryptedText, finalTimestamp, targetSessionId);
 
     // Clean up older messages, keeping only the last 100 messages for this specific session
     await dbRun(`
@@ -1319,6 +1395,12 @@ app.post("/api/chat/save", authenticateUser, async (req: any, res: any) => {
 const SYSTEM_PROMPT = `You are MindMate.
 
 MindMate is a warm, emotionally intelligent AI companion designed for college students. You are not a therapist, teacher, motivational speaker, or customer support agent. You are the calm senior every student wishes they had during stressful times.
+
+SAFE COMPANION MODE PRINCIPLES:
+- Be completely non-judgmental.
+- Avoid overwhelming the user with advice. Prioritize active listening and validating their experience before proposing any actions.
+- Act like a supportive listener. Use a reassuring, warm tone.
+- Tone reference: "I'm here for you. You can share as much as you want."
 
 PERSONALITY
 
@@ -1546,59 +1628,35 @@ app.post("/api/chat", authenticateUser, async (req: any, res: any) => {
       }
     }
 
-    // Map preceding history to OpenRouter standard format (role: user / assistant)
-    const precedingHistory = cleanHistory.slice(0, -1);
-    const cappedPreceding = precedingHistory.length > 24
-      ? precedingHistory.slice(-24)
-      : precedingHistory;
-
-    const messages = [];
-    messages.push({
-      role: "system",
-      content: SYSTEM_PROMPT
-    });
-    messages.push({
-      role: "system",
-      content: `
-  These rules OVERRIDE any default AI style.
-
-  Never begin a reply with:
-  "I understand"
-  "I'm sorry to hear that"
-  "It's normal"
-  "It's okay"
-  "I'm here for you"
-
-  Do not sound like a therapist or customer support.
-
-  React naturally to the user's words first.
-
-  Write like a caring senior student texting a close junior.
-
-  Keep replies between 2 and 4 short sentences.
-
-  Don't explain obvious things.
-
-  Don't repeat advice already given.
-
-  Don't end every reply with a question.
-
-  If the user simply wants comfort, don't ask a question.
-
-  Every reply should feel personal and spontaneous rather than following a template.
-  `
-    });
-    for (const msg of cappedPreceding) {
-      messages.push({
-        role: msg.role === "model" ? "assistant" : "user",
-        content: msg.parts[0].text
-      });
+    // Call Flask ML API for emotion detection
+    let detectedEmotion: string | null = null;
+    let detectedConfidence: number | null = null;
+    try {
+      const mlResponse = await axios.post("http://localhost:5000/predict", {
+        message: userMessageText,
+        user_id: req.userId
+      }, { timeout: 3000 });
+      if (mlResponse.data && mlResponse.data.emotion) {
+        detectedEmotion = mlResponse.data.emotion;
+        detectedConfidence = mlResponse.data.confidence || 0.0;
+        console.log(`[ML Model] Detected emotion: ${detectedEmotion} (confidence: ${detectedConfidence})`);
+      }
+    } catch (mlErr: any) {
+      console.warn("Failed to contact ML model API, continuing with standard flow:", mlErr.message);
     }
 
-    messages.push({
-      role: "user",
-      content: userMessageText
-    });
+    // Save detected emotion log to SQLite
+    if (detectedEmotion) {
+      try {
+        const logId = `elog_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        await dbRun(
+          "INSERT INTO emotion_logs (id, user_id, emotion, confidence, created_at) VALUES (?, ?, ?, ?, ?)",
+          logId, req.userId, detectedEmotion, detectedConfidence || 0.0, Date.now()
+        );
+      } catch (logErr: any) {
+        console.warn("Could not log emotion to SQLite:", logErr.message);
+      }
+    }
 
     // Crisis Detection Guard (remains separate from AI processing)
     const normalizedMsg = userMessageText.toLowerCase();
@@ -1609,17 +1667,76 @@ app.post("/api/chat", authenticateUser, async (req: any, res: any) => {
       });
     }
 
+
+    const userMessage = cleanHistory[cleanHistory.length - 1]?.parts?.[0]?.text || "";
+    const emotion = detectedEmotion || "neutral";
+
+    const precedingHistory = cleanHistory.slice(0, -1);
+    const cappedPreceding = precedingHistory.length > 24
+      ? precedingHistory.slice(-24)
+      : precedingHistory;
+
+    const historyMessages: any[] = [];
+    for (const msg of cappedPreceding) {
+      historyMessages.push({
+        role: msg.role === "model" ? "assistant" : "user",
+        content: msg.parts[0].text
+      });
+    }
+
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY} `,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages,
+        model: "openai/gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: `
+You are MindMate, a caring friend texting a student.
 
-        temperature: 0.95,
+Reply like a real friend, not a therapist, counselor, teacher, or AI assistant.
+
+Keep the reply to 1–2 short sentences.
+React naturally to the user's latest message.
+Use casual, natural language and contractions.
+Lowercase is fine.
+Do not give unsolicited advice.
+Do not give study tips or productivity advice unless the user asks.
+Do not explain their emotion back to them.
+Do not force a question at the end.
+
+Never use:
+'I understand'
+'I'm sorry to hear that'
+'It's normal'
+'It's okay'
+'I'm here for you'
+'Hang in there'
+'You've got this'
+
+Avoid motivational, clinical, formal, or therapist-like language.
+
+The user's latest message is:
+${userMessage}
+
+Detected emotion:
+${emotion}
+
+Return ONLY the natural friend-like reply.
+`
+          },
+          ...historyMessages,
+          {
+            role: "user",
+            content: userMessage
+          }
+        ],
+
+        temperature: 0.7,
         top_p: 0.9,
         frequency_penalty: 0.5,
         presence_penalty: 0.4,
@@ -1640,15 +1757,152 @@ app.post("/api/chat", authenticateUser, async (req: any, res: any) => {
     }
 
     console.log("[Chat AI] Sending successful OpenRouter response.");
-    res.json({ text: aiReply });
+    res.json({
+      text: aiReply,
+      emotion: detectedEmotion,
+      confidence: detectedConfidence
+    });
   } catch (error: any) {
     logError("Chat route error", error);
     const fallbackMsg = req.body?.history?.[req.body.history.length - 1]?.parts?.[0]?.text || "";
     const fallbackReply = generateFallbackChatResponse(fallbackMsg, req.body?.userState);
     console.log("[Chat AI] Sending fallback local logic response.");
-    res.json({ text: fallbackReply });
+    res.json({
+      text: fallbackReply,
+      emotion: null,
+      confidence: null
+    });
   }
 });
+
+app.get("/api/streak", authenticateUser, async (req: any, res: any) => {
+  try {
+    const userId = req.userId;
+    const today = new Date().toISOString().split('T')[0];
+
+    let streak = await dbGet("SELECT * FROM user_streaks WHERE user_id = ?", userId);
+
+    if (!streak) {
+      await dbRun(
+        "INSERT INTO user_streaks (user_id, last_checkin_date, streak_count) VALUES (?, ?, ?)",
+        userId, today, 1
+      );
+      return res.json({ streakCount: 1 });
+    }
+
+    const lastDate = streak.last_checkin_date;
+    const lastTime = new Date(lastDate).getTime();
+    const todayTime = new Date(today).getTime();
+    const diffDays = Math.round((todayTime - lastTime) / (1000 * 60 * 60 * 24));
+
+    let newStreakCount = streak.streak_count;
+
+    if (diffDays === 1) {
+      newStreakCount += 1;
+      await dbRun(
+        "UPDATE user_streaks SET last_checkin_date = ?, streak_count = ? WHERE user_id = ?",
+        today, newStreakCount, userId
+      );
+    } else if (diffDays > 1) {
+      newStreakCount = 1;
+      await dbRun(
+        "UPDATE user_streaks SET last_checkin_date = ?, streak_count = ? WHERE user_id = ?",
+        today, newStreakCount, userId
+      );
+    }
+
+    res.json({ streakCount: newStreakCount });
+  } catch (error: any) {
+    logError("Streak endpoint error", error);
+    res.status(500).json({ error: "Failed to fetch streak" });
+  }
+});
+
+app.get("/api/emotion-trends", authenticateUser, async (req: any, res: any) => {
+  try {
+    const userId = req.userId;
+    const logs = await dbAll(
+      "SELECT emotion, confidence, created_at FROM emotion_logs WHERE user_id = ? ORDER BY created_at ASC LIMIT 100",
+      userId
+    );
+    res.json(logs);
+  } catch (error: any) {
+    logError("Emotion trends error", error);
+    res.status(500).json({ error: "Failed to fetch emotion trends" });
+  }
+});
+
+// Demo feedback API endpoints
+app.post("/api/feedback", authenticateUser, async (req: any, res: any) => {
+  try {
+    const { rating, review } = req.body;
+    if (typeof rating !== "number" || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: "Rating must be an integer between 1 and 5." });
+    }
+    if (!review || typeof review !== "string" || review.trim().length === 0) {
+      return res.status(400).json({ error: "Review text is required." });
+    }
+    if (review.length > 1000) {
+      return res.status(400).json({ error: "Review must not exceed 1000 characters." });
+    }
+
+    const feedbackId = "fb_" + Math.random().toString(36).substr(2, 9) + "_" + Date.now();
+    await dbRun(
+      "INSERT INTO feedback (id, user_id, rating, review, created_at) VALUES (?, ?, ?, ?, ?)",
+      feedbackId, req.userId, rating, review.trim(), Date.now()
+    );
+
+    res.json({ success: true, message: "Feedback submitted successfully." });
+  } catch (error: any) {
+    logError("Submit feedback error", error);
+    res.status(500).json({ error: "Failed to submit feedback." });
+  }
+});
+
+app.get("/api/feedback", async (req: any, res: any) => {
+  try {
+    // Fetch all feedback to compute stats
+    const rows = await dbAll("SELECT id, rating, review, created_at, user_id FROM feedback ORDER BY created_at DESC") as any[];
+
+    // Calculate aggregated stats
+    const totalCount = rows.length;
+    const averageRating = totalCount > 0 ? (rows.reduce((sum, r) => sum + r.rating, 0) / totalCount) : 0;
+    
+    // Map distinct user IDs to anonymous User numbers dynamically (e.g. user_abc -> User 001)
+    const userIdMap = new Map<string, string>();
+    let userSeq = 1;
+
+    const anonymizedFeedbacks = rows.map(r => {
+      let anonName = userIdMap.get(r.user_id);
+      if (!anonName) {
+        anonName = `User ${String(userSeq++).padStart(3, '0')}`;
+        userIdMap.set(r.user_id, anonName);
+      }
+      return {
+        id: r.id,
+        rating: r.rating,
+        review: r.review,
+        created_at: r.created_at,
+        userAlias: anonName
+      };
+    });
+
+    const uniqueUsersCount = userIdMap.size;
+
+    res.json({
+      summary: {
+        totalFeedback: totalCount,
+        averageRating: parseFloat(averageRating.toFixed(1)),
+        uniqueUsers: uniqueUsersCount
+      },
+      feedbacks: anonymizedFeedbacks
+    });
+  } catch (error: any) {
+    logError("Get feedback error", error);
+    res.status(500).json({ error: "Failed to load feedback data." });
+  }
+});
+
 
 const DEFAULT_INSIGHTS = [
   "Breathe in, breathe out. Focus only on this present moment and what is within your control.",

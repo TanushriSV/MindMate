@@ -7,6 +7,7 @@ import * as aiService from '../../services/geminiService';
 import { useUser } from '../../context/UserContext';
 import { useEntries } from '../../context/EntriesContext';
 import { useTranslation } from 'react-i18next';
+import { API_BASE_URL } from '../../apiConfig';
 
 function messageSuggestsBreathe(text: string): boolean {
   const norm = text.toLowerCase();
@@ -62,6 +63,28 @@ function renderMessageText(text: string, navigate: (path: string) => void) {
   return parts.length > 0 ? parts : text;
 }
 
+function getEmotionTag(emotion: string, confidence: number | null | undefined): string {
+  const emojiMap: Record<string, string> = {
+    stress: '😟',
+    anxiety: '😰',
+    sadness: '😢',
+    motivation: '💪'
+  };
+  const emoji = emojiMap[emotion] || '✨';
+  
+  let level = '';
+  if (confidence !== undefined && confidence !== null) {
+    if (confidence <= 0.4) level = 'Low';
+    else if (confidence <= 0.7) level = 'Medium';
+    else level = 'High';
+  }
+  
+  const capEmotion = emotion.charAt(0).toUpperCase() + emotion.slice(1);
+  const confidenceStr = confidence !== undefined && confidence !== null ? ` - ${confidence.toFixed(2)}` : '';
+  
+  return `Detected Emotion: ${capEmotion} (${level}${confidenceStr}) ${emoji}`;
+}
+
 export default function Chat() {
   const { user } = useUser();
   const { entries } = useEntries();
@@ -86,8 +109,31 @@ export default function Chat() {
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renamingValue, setRenamingValue] = useState('');
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [streakCount, setStreakCount] = useState<number | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const fetchStreak = async () => {
+      if (!user) return;
+      try {
+        const userStr = localStorage.getItem('mindmate_user');
+        const token = userStr ? JSON.parse(userStr).token : null;
+        const res = await fetch(API_BASE_URL + "/api/streak", {
+          headers: {
+            ...(token ? { "Authorization": `Bearer ${token}` } : {})
+          }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setStreakCount(data.streakCount);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch streak count:", err);
+      }
+    };
+    fetchStreak();
+  }, [user]);
 
   const formatSessionTitle = (title: string, createdAt?: number) => {
     if (!title) return t('chat.newConversation');
@@ -343,8 +389,10 @@ export default function Chat() {
       const aiMsg: ChatMessage = {
         id: `msg_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         role: 'model',
-        text: response,
-        timestamp: Date.now()
+        text: response.text,
+        timestamp: Date.now(),
+        emotion: response.emotion,
+        confidence: response.confidence
       };
 
       setMessages(prev => [...prev, aiMsg]);
@@ -557,6 +605,11 @@ export default function Chat() {
           </div>
           
           <div className="flex items-center gap-2">
+            {streakCount !== null && (
+              <span className="text-[10px] sm:text-xs font-black text-orange-500 bg-orange-50 dark:bg-orange-950/20 px-2 py-1 sm:px-3 sm:py-1.5 rounded-full border border-orange-200 dark:border-orange-900/30 select-none animate-pulse shrink-0">
+                🔥 {streakCount} Day Streak
+              </span>
+            )}
             <button
               onClick={handleNewChat}
               className="md:hidden flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-primary hover:bg-primary/95 rounded-xl shadow-md transition-all cursor-pointer"
@@ -603,6 +656,11 @@ export default function Chat() {
                       {m.role === 'user' ? 'ME' : 'AI'}
                     </div>
                     <div className="flex flex-col gap-2 max-w-full">
+                      {m.role === 'model' && m.emotion && (
+                        <span className="text-[10px] font-bold text-primary px-2 select-none animate-fade-in flex items-center gap-1">
+                          {getEmotionTag(m.emotion, m.confidence)}
+                        </span>
+                      )}
                       <div className={`p-4.5 rounded-2xl text-sm font-medium leading-relaxed calm-shadow ${
                         m.role === 'user' 
                           ? 'bg-secondary-container text-on-secondary-container rounded-br-none' 

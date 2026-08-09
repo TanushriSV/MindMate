@@ -7,3 +7,9 @@ coverage/
 .env
 .env.local
 !.env.example
+mindmate.db
+mindmate.db-shm
+mindmate.db-wal
+*.db
+*.db-shm
+*.db-wal
