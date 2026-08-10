@@ -1600,7 +1600,12 @@ app.post("/api/chat", authenticateUser, async (req: any, res: any) => {
     let detectedEmotion: string | null = null;
     let detectedConfidence: number | null = null;
     try {
-      const mlResponse = await axios.post("http://localhost:5000/predict", {
+      const mlApiUrl = process.env.ML_API_URL;
+      if (!mlApiUrl && process.env.NODE_ENV === "production") {
+        throw new Error("Required ML_API_URL environment variable is missing in production.");
+      }
+      const resolvedMlUrl = mlApiUrl || "http://localhost:5000";
+      const mlResponse = await axios.post(`${resolvedMlUrl}/predict`, {
         message: userMessageText,
         user_id: req.userId
       }, { timeout: 3000 });

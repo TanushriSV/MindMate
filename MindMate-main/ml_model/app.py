@@ -72,6 +72,13 @@ def generate_human_response(user_input):
 # -------------------------
 # API ROUTE
 # -------------------------
+@app.route('/', methods=['GET'])
+def health_check():
+    return jsonify({
+        "status": "ok",
+        "service": "MindMate ML API"
+    })
+
 @app.route('/predict', methods=['POST'])
 def predict():
     print("📩 REQUEST HIT /predict")
